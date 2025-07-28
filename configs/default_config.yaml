@@ -1,0 +1,148 @@
+# /configs/default_config.yaml
+
+# --- General Generation Settings ---
+generation:
+  num_samples: 10
+  num_workers: -1 # -1 means use all available CPU cores
+  base_seed: 43
+  output_dir: "./base-dataset"
+  dry_run_num_samples: 10 # Number of samples for a dry run
+
+# --- Visualization Settings ---
+visualization:
+  enabled: true
+  render_on_dry_run_only: true
+  coloring: "textline" # "textbox" or "textline"
+  point_size_multiplier: 1.0
+
+# --- Page Generation ---
+page:
+  width: { dist: "uniform_int", min: 1000, max: 3000 }
+  height: { dist: "uniform_int", min: 1000, max: 3000 }
+  layout_strategy:
+    # Name of the strategy to use. Options are registered in the code.
+    # We can use a choice distribution to randomly select a strategy per page.
+    dist: "choice"
+    choices:
+      - "rejection_sampling"
+      - "rejection_sampling"
+      - "rejection_sampling"
+      - "rejection_sampling"
+      - "grid" # Make grid layout less frequent
+    weights: [0.2, 0.2, 0.2, 0.2, 0.2] # Example of uniform weights
+
+# --- Layout Strategy: Rejection Sampling ---
+rejection_sampling:
+  num_textboxes: { dist: "uniform_int", min: 1, max: 10 }
+  max_placement_attempts: { dist: "uniform_int", min: 5, max: 50 } # N attempts
+  max_box_generation_attempts: { dist: "uniform_int", min: 2, max: 50 } # K attempts
+  # Probability of generating different types of textboxes
+  textbox_type_probabilities:
+    main_text: 0.60
+    marginalia: 0.25
+    page_number: 0.15
+
+
+# --- Layout Strategy: Grid ---
+grid_layout:
+  rows: { dist: "uniform_int", min: 10, max: 30 }
+  cols: { dist: "uniform_int", min: 10, max: 30 }
+  spacing: { dist: "uniform_float", min: 25.0, max: 50.0 }
+  # For grid, we only apply a limited set of augmentations
+  augmentations:
+    - "point_level_jitter"
+    - "font_size_variation"
+    - "point_dropout"
+    # Note: Rotation is handled via the textbox orientation parameter
+
+# --- TextBox Content & Micro-Variations (Phase 1) ---
+textbox_content:
+  # Base parameters per textbox type
+  main_text:
+    font_size: { dist: "uniform_int", min: 10, max: 50 }
+    lines_per_box: { dist: "uniform_int", min: 5, max: 25 }
+    words_per_line: { dist: "uniform_int", min: 1, max: 1 }
+    alignment: { dist: "choice", choices: ["left", "right", "center", "justify"], weights: [0.4, 0.1, 0.1, 0.4] }
+    interlinear_gloss_probability: 0.2 # Probability that any given line in this box will have a gloss
+  marginalia:
+    font_size: { dist: "uniform_int", min: 12, max: 18 }
+    lines_per_box: { dist: "uniform_int", min: 2, max: 8 }
+    words_per_line: { dist: "uniform_int", min: 1, max: 1 }
+    alignment: { dist: "choice", choices: ["left", "right"], weights: [0.7, 0.3] }
+  page_number:
+    font_size: { dist: "uniform_int", min: 18, max: 28 }
+    lines_per_box: { dist: "constant", value: 1 }
+    words_per_line: { dist: "uniform_int", min: 1, max: 3 }
+    alignment: { dist: "choice", choices: ["left", "right", "center"], weights: [0.3, 0.3, 0.4] }
+  interlinear_gloss:
+    font_size_factor: { dist: "uniform_float", min: 0.5, max: 0.7 } 
+    words_per_line: { dist: "uniform_int", min: 1, max: 5 }
+    vertical_offset_factor: { dist: "uniform_float", min: 0.4, max: 0.8 }
+
+  chars_per_word: { dist: "uniform_int", min: 40, max: 50 }
+  # chars_per_word:
+  #   dist: "choice"
+  #   choices: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+  #   weights: [0.10, 0.15, 0.20, 0.15, 0.12, 0.08, 0.06, 0.05, 0.03, 0.02, 0.01, 0.01, 0.01]
+  # Spacing is defined as a multiplier of the base font_size
+  character_spacing_factor: { dist: "uniform_float", min: 0.8, max: 1.5 }
+  word_spacing_factor: { dist: "uniform_float", min: 2.0, max: 4.0 }
+  line_spacing_factor: { dist: "uniform_float", min: 1.5, max: 3.0 }
+
+  # Line Breaks
+  line_break_probability: { dist: "uniform_float", min: 0.0, max: 0.05 }
+
+  # Augmentations (Phase 1)
+  font_size_variation:
+    enabled: true
+    variation_factor: { dist: "normal", mean: 0.0, std: 0.05 } # Multiplicative factor
+  point_level_jitter:
+    enabled: true
+    # Jitter is relative to font size
+    jitter_std_factor: { dist: "uniform_float", min: 0.05, max: 0.15 }
+  congestion_jitter:
+    enabled: true
+    # Percentage of points to be heavily jittered
+    percentage: { dist: "uniform_float", min: 0.0, max: 0.03 }
+    # Jitter strength as a multiplier of line spacing
+    strength_factor: { dist: "uniform_float", min: 0.1, max: 0.6 }
+
+
+# --- TextBox Geometric Distortion (Phase 2) ---
+textbox_distortion:
+  # Each distortion has a probability of being applied
+  shear:
+    enabled: true
+    probability: 0.5
+    shear_factor_x: { dist: "uniform_float", min: -0.3, max: 0.3 }
+    shear_factor_y: { dist: "uniform_float", min: -0.3, max: 0.3 }
+  stretch:
+    enabled: true
+    probability: 0.5
+    stretch_factor_x: { dist: "uniform_float", min: 0.8, max: 1.2 }
+    stretch_factor_y: { dist: "uniform_float", min: 0.8, max: 1.2 }
+  warp_curl:
+    enabled: true
+    probability: 0.6
+    # Amplitude is relative to textbox dimensions
+    amplitude_factor: { dist: "uniform_float", min: 0.01, max: 0.05 }
+    # Frequency of the wave
+    frequency_factor_x: { dist: "uniform_float", min: 0.5, max: 1.2 }
+    frequency_factor_y: { dist: "uniform_float", min: 0.5, max: 1.2 }
+    phase_x: { dist: "uniform_float", min: 0.0, max: 6.28 } # 2*pi
+    phase_y: { dist: "uniform_float", min: 0.0, max: 6.28 }
+
+# --- Page-Level Augmentations (Phase 3) ---
+page_augmentations:
+  # Textbox placement orientation (in degrees)
+  orientation_deg:
+    dist: "choice"
+    choices: [0, 90, -90, "other"]
+    weights: [0.6, 0.1, 0.1, 0.2]
+  # If "other" is chosen, sample from this distribution
+  orientation_other_range: { dist: "uniform_float", min: -45, max: 45 }
+
+  # Point Dropout (Missing Characters)
+  point_dropout:
+    enabled: true
+    probability: { dist: "uniform_float", min: 0.0, max: 0.02 }
