@@ -118,8 +118,10 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
     base_font_size = sample_from_distribution(box_config.font_size, rng)
     
     char_spacing = base_font_size * sample_from_distribution(content_config.character_spacing_factor, rng)
-    word_spacing = base_font_size * sample_from_distribution(content_config.word_spacing_factor, rng)
-    line_spacing = base_font_size * sample_from_distribution(content_config.line_spacing_factor, rng)
+    word_spacing = char_spacing * sample_from_distribution(content_config.word_spacing_factor, rng)
+    # word_spacing = base_font_size * sample_from_distribution(content_config.word_spacing_factor, rng)
+    line_spacing = char_spacing * sample_from_distribution(content_config.line_spacing_factor, rng)
+    # line_spacing = base_font_size * sample_from_distribution(content_config.line_spacing_factor, rng)
 
     text_lines = []
     max_line_width = 0

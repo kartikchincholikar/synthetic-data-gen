@@ -17,8 +17,8 @@ visualization:
 
 # --- Page Generation ---
 page:
-  width: { dist: "uniform_int", min: 1000, max: 3000 }
-  height: { dist: "uniform_int", min: 1000, max: 3000 }
+  width: { dist: "uniform_int", min: 1500, max: 3000 }
+  height: { dist: "uniform_int", min: 750, max: 1500 }
   layout_strategy:
     # Name of the strategy to use. Options are registered in the code.
     # We can use a choice distribution to randomly select a strategy per page.
@@ -59,24 +59,24 @@ grid_layout:
 textbox_content:
   # Base parameters per textbox type
   main_text:
-    font_size: { dist: "uniform_int", min: 10, max: 50 }
+    font_size: { dist: "uniform_int", min: 4, max: 40 }
     lines_per_box: { dist: "uniform_int", min: 5, max: 25 }
     words_per_line: { dist: "uniform_int", min: 1, max: 1 }
     alignment: { dist: "choice", choices: ["left", "right", "center", "justify"], weights: [0.4, 0.1, 0.1, 0.4] }
     interlinear_gloss_probability: 0.2 # Probability that any given line in this box will have a gloss
   marginalia:
-    font_size: { dist: "uniform_int", min: 12, max: 18 }
+    font_size: { dist: "uniform_int", min: 3, max: 30 }
     lines_per_box: { dist: "uniform_int", min: 2, max: 8 }
     words_per_line: { dist: "uniform_int", min: 1, max: 1 }
     alignment: { dist: "choice", choices: ["left", "right"], weights: [0.7, 0.3] }
   page_number:
-    font_size: { dist: "uniform_int", min: 18, max: 28 }
+    font_size: { dist: "uniform_int", min: 3, max: 40 }
     lines_per_box: { dist: "constant", value: 1 }
     words_per_line: { dist: "uniform_int", min: 1, max: 3 }
     alignment: { dist: "choice", choices: ["left", "right", "center"], weights: [0.3, 0.3, 0.4] }
   interlinear_gloss:
-    font_size_factor: { dist: "uniform_float", min: 0.5, max: 0.7 } 
-    words_per_line: { dist: "uniform_int", min: 1, max: 5 }
+    font_size_factor: { dist: "uniform_float", min: 0.1, max: 0.6 } 
+    words_per_line: { dist: "uniform_int", min: 1, max: 1 }
     vertical_offset_factor: { dist: "uniform_float", min: 0.4, max: 0.8 }
 
   chars_per_word: { dist: "uniform_int", min: 40, max: 50 }
@@ -84,10 +84,18 @@ textbox_content:
   #   dist: "choice"
   #   choices: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
   #   weights: [0.10, 0.15, 0.20, 0.15, 0.12, 0.08, 0.06, 0.05, 0.03, 0.02, 0.01, 0.01, 0.01]
+  
   # Spacing is defined as a multiplier of the base font_size
-  character_spacing_factor: { dist: "uniform_float", min: 0.8, max: 1.5 }
-  word_spacing_factor: { dist: "uniform_float", min: 2.0, max: 4.0 }
-  line_spacing_factor: { dist: "uniform_float", min: 1.5, max: 3.0 }
+  character_spacing_factor: { dist: "uniform_float", min: 1.0, max: 1.6 }
+  # word_spacing_factor: { dist: "uniform_float", min: 2.0, max: 4.0 }
+  # line_spacing_factor: { dist: "uniform_float", min: 1.5, max: 3.0 }
+
+  # multiplier of character spacing
+  word_spacing_factor: { dist: "uniform_float", min: 1.4, max: 2.0 }
+
+  #multiplier of character spacing
+  line_spacing_factor: { dist: "uniform_float", min: 1.1, max: 2.0 }
+
 
   # Line Breaks
   line_break_probability: { dist: "uniform_float", min: 0.0, max: 0.05 }
@@ -95,7 +103,7 @@ textbox_content:
   # Augmentations (Phase 1)
   font_size_variation:
     enabled: true
-    variation_factor: { dist: "normal", mean: 0.0, std: 0.05 } # Multiplicative factor
+    variation_factor: { dist: "normal", mean: 0.0, std: 0.25 } # Multiplicative factor
   point_level_jitter:
     enabled: true
     # Jitter is relative to font size
@@ -105,7 +113,7 @@ textbox_content:
     # Percentage of points to be heavily jittered
     percentage: { dist: "uniform_float", min: 0.0, max: 0.03 }
     # Jitter strength as a multiplier of line spacing
-    strength_factor: { dist: "uniform_float", min: 0.1, max: 0.6 }
+    strength_factor: { dist: "uniform_float", min: 0.1, max: 0.5 }
 
 
 # --- TextBox Geometric Distortion (Phase 2) ---

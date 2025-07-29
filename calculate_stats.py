@@ -8,6 +8,7 @@ from itertools import combinations
 import numpy as np
 from scipy.spatial import KDTree
 from sklearn.linear_model import RANSACRegressor
+from sklearn.mixture import GaussianMixture # New import
 
 # --- Configuration ---
 # K for K-Nearest Neighbors in inter-line spacing calculation
@@ -16,6 +17,8 @@ INTER_LINE_K = 10
 HEURISTIC_GRAPH_K = 6
 # Cosine similarity threshold for opposite neighbors
 OPPOSITE_NEIGHBOR_COS_SIM_THRESHOLD = -0.8
+# Number of bins for font size analysis
+NUM_FONT_BINS = 8
 
 # --- Utility Functions ---
 
@@ -95,13 +98,12 @@ def load_page_data(page_id: int, base_path: str) -> (dict, np.ndarray, np.ndarra
 def calculate_intra_line_stats(lines_data: dict) -> dict:
     """
     Calculates statistics that exist *within* each text line.
-    - Relative Horizontal Spacing (RHS)
-    - Vertical Baseline Jitter
-    - Intra-Line Font Size Variation (CV)
-    - Local Writing Angle
+    - MODIFIED: Now returns RHS paired with its associated font size.
     """
     logging.info("Calculating intra-line statistics...")
-    all_rhs, all_jitter, all_font_size_cv, all_angles = [], [], [], []
+    # MODIFICATION: We now store pairs of (RHS, avg_font_size)
+    rhs_with_font_size = []
+    all_jitter, all_font_size_cv, all_angles = [], [], []
 
     for line_label, line_data in lines_data.items():
         points = line_data['points']
@@ -111,35 +113,29 @@ def calculate_intra_line_stats(lines_data: dict) -> dict:
             logging.warning(f"Line {line_label} has < 2 points. Skipping spacing/angle/jitter calculations.")
             continue
 
-        # 1. Intra-Line Font Size Variation
         font_sizes = points[:, 2]
         if np.mean(font_sizes) > 0:
             cv = np.std(font_sizes) / np.mean(font_sizes)
             all_font_size_cv.append(cv)
 
-        # Build KD-Tree for efficient intra-line neighbor search
-        line_kdtree = KDTree(points[:, :2]) # Use only x, y for spatial search
-        
-        # Query for the nearest neighbor for each point in the line
-        # k=2 because the point itself is the 0-th neighbor
+        line_kdtree = KDTree(points[:, :2])
         distances, indices = line_kdtree.query(points[:, :2], k=2)
 
-        # 2. Relative Horizontal Spacing & 3. Local Writing Angle
         for i in range(n_points):
             neighbor_idx = indices[i, 1]
             p1 = points[i]
             p2 = points[neighbor_idx]
-
             dist = distances[i, 1]
             s_avg = (p1[2] + p2[2]) / 2.0
+            
             if s_avg > 0:
-                all_rhs.append(dist / s_avg)
+                # MODIFICATION: Store the pair
+                rhs_with_font_size.append((dist / s_avg, s_avg))
 
             dx = p2[0] - p1[0]
             dy = p2[1] - p1[1]
             all_angles.append(np.arctan2(dy, dx))
             
-        # 4. Vertical Baseline Jitter (using RANSAC for robustness)
         X = points[:, 0].reshape(-1, 1)
         y = points[:, 1]
         try:
@@ -147,15 +143,14 @@ def calculate_intra_line_stats(lines_data: dict) -> dict:
             ransac.fit(X, y)
             y_pred = ransac.predict(X)
             residuals = y - y_pred
-            # Normalize jitter by font size
             jitter = residuals / points[:, 2]
             all_jitter.extend(jitter.tolist())
         except ValueError as e:
             logging.warning(f"Could not fit RANSAC for line {line_label} (n_points={n_points}): {e}")
 
-
+    # MODIFICATION: Return the structured array
     return {
-        "relative_horizontal_spacing": np.array(all_rhs),
+        "rhs_with_font_size": np.array(rhs_with_font_size),
         "vertical_baseline_jitter": np.array(all_jitter),
         "intra_line_font_size_cv": np.array(all_font_size_cv),
         "local_writing_angle_rad": np.array(all_angles)
@@ -163,43 +158,30 @@ def calculate_intra_line_stats(lines_data: dict) -> dict:
 
 
 def calculate_inter_line_stats(all_points: np.ndarray, lines_data: dict, page_dims: dict) -> dict:
-    """
-    Calculates statistics that describe relationships *between* text lines.
-    - Relative Vertical Spacing (Line Spacing)
-    - Line Alignment (Left, Right, Center)
-    """
+    # This function remains unchanged
     logging.info("Calculating inter-line statistics...")
     all_rvs = []
     
-    # 1. Relative Vertical Spacing (RVS)
     if len(all_points) > INTER_LINE_K:
         all_labels = np.array([ld['label'] for ld in lines_data.values() for _ in range(len(ld['points']))])
-        # Build a KD-Tree of all points on the page
         page_kdtree = KDTree(all_points[:, :2])
-        
-        # For each point, find neighbors and filter for those on other lines
         distances, indices = page_kdtree.query(all_points[:, :2], k=INTER_LINE_K)
         
         for i in range(len(all_points)):
             current_label = all_labels[i]
-            neighbor_indices = indices[i, 1:] # Exclude self
+            neighbor_indices = indices[i, 1:]
             neighbor_labels = all_labels[neighbor_indices]
-            
-            # Find neighbors on different lines
             other_line_mask = neighbor_labels != current_label
             
             if np.any(other_line_mask):
                 other_line_neighbors = all_points[neighbor_indices[other_line_mask]]
                 vertical_distances = np.abs(all_points[i, 1] - other_line_neighbors[:, 1])
                 min_vd = np.min(vertical_distances)
-                
-                # Normalize by current point's font size
                 if all_points[i, 2] > 0:
                     all_rvs.append(min_vd / all_points[i, 2])
     else:
         logging.warning("Not enough points on page to calculate inter-line spacing.")
 
-    # 2. Line Alignment
     line_x_mins, line_x_maxs, line_centers = [], [], []
     page_width = page_dims['width']
     
@@ -207,10 +189,7 @@ def calculate_inter_line_stats(all_points: np.ndarray, lines_data: dict, page_di
         points = line_data['points']
         if len(points) > 0:
             x_coords = points[:, 0]
-            x_min = np.min(x_coords)
-            x_max = np.max(x_coords)
-            
-            # Normalize by page width for comparability
+            x_min, x_max = np.min(x_coords), np.max(x_coords)
             line_x_mins.append(x_min / page_width)
             line_x_maxs.append(x_max / page_width)
             line_centers.append(((x_min + x_max) / 2.0) / page_width)
@@ -222,48 +201,27 @@ def calculate_inter_line_stats(all_points: np.ndarray, lines_data: dict, page_di
         "line_alignment_center_normalized": np.array(line_centers)
     }
 
+
 def calculate_page_level_stats(all_points: np.ndarray, page_dims: dict) -> dict:
-    """
-    Calculates global statistics for the entire page.
-    - Page Aspect Ratio (Width / Height)
-    - Page Density (Character and Ink)
-    """
+    # This function remains unchanged
     logging.info("Calculating page-level statistics...")
-    
-    # --- NEW: Calculate Aspect Ratio ---
     width = page_dims.get('width', 0)
     height = page_dims.get('height', 0)
+    aspect_ratio = width / height if height > 0 else float('nan')
     
-    if height > 0:
-        aspect_ratio = width / height
-    else:
-        logging.warning("Page height is 0, cannot calculate aspect ratio. Setting to NaN.")
-        aspect_ratio = float('nan')
-        
-    # --- Existing Density Calculations ---
     n_chars = len(all_points)
     if n_chars == 0:
-        return {
-            "aspect_ratio": aspect_ratio,
-            "character_density": 0, 
-            "ink_density": 0
-        }
+        return {"aspect_ratio": aspect_ratio, "character_density": 0, "ink_density": 0}
         
     x_coords, y_coords, sizes = all_points[:, 0], all_points[:, 1], all_points[:, 2]
-    
-    # Use text block bounding box for density, not full page dimensions
     text_block_width = np.max(x_coords) - np.min(x_coords)
     text_block_height = np.max(y_coords) - np.min(y_coords)
     text_block_area = text_block_width * text_block_height
 
     if text_block_area == 0:
-        logging.warning("Text block area is zero, cannot calculate density.")
-        char_density = float('inf')
-        ink_density = float('inf')
+        char_density, ink_density = float('inf'), float('inf')
     else:
-        # Total area of "ink", approximating each char as a circle
         ink_area = np.sum(np.pi * (sizes / 2.0)**2)
-        
         char_density = n_chars / text_block_area
         ink_density = ink_area / text_block_area
 
@@ -273,132 +231,167 @@ def calculate_page_level_stats(all_points: np.ndarray, page_dims: dict) -> dict:
         "ink_density": ink_density
     }
 
+
 def calculate_graph_based_stats(all_points: np.ndarray, page_dims: dict) -> dict:
-    """
-    Calculates statistics based on the heuristic graph construction method.
-    - Heuristic Degree Distribution
-    - Overlap Distribution
-    """
+    # This function remains unchanged
     logging.info("Calculating graph-based statistics...")
     n_points = len(all_points)
     if n_points < HEURISTIC_GRAPH_K:
-        logging.warning(f"Not enough points ({n_points}) for graph-based stats. Need at least {HEURISTIC_GRAPH_K}.")
         return {"heuristic_degree": np.array([]), "overlap": np.array([])}
 
-    # Step 1: Normalization
     max_dim = max(page_dims['width'], page_dims['height'])
     max_s = np.max(all_points[:, 2])
-    
     normalized_points = np.copy(all_points)
     normalized_points[:, :2] /= max_dim
-    if max_s > 0:
-        normalized_points[:, 2] /= max_s
+    if max_s > 0: normalized_points[:, 2] /= max_s
 
-    # Step 2: Heuristic Graph Construction
     kdtree = KDTree(normalized_points[:, :2])
     heuristic_directed_edges = []
-    
     for i in range(n_points):
-        # Find neighbors
         _, neighbor_indices = kdtree.query(normalized_points[i, :2], k=HEURISTIC_GRAPH_K)
-        neighbor_indices = neighbor_indices[1:] # Exclude self
-        
-        best_pair = None
-        min_dist_sum = float('inf')
-        
-        # Identify opposite pairs
+        neighbor_indices = neighbor_indices[1:]
+        best_pair, min_dist_sum = None, float('inf')
         for n1_idx, n2_idx in combinations(neighbor_indices, 2):
             vec1 = normalized_points[n1_idx, :2] - normalized_points[i, :2]
             vec2 = normalized_points[n2_idx, :2] - normalized_points[i, :2]
-            
-            norm1 = np.linalg.norm(vec1)
-            norm2 = np.linalg.norm(vec2)
-            
+            norm1, norm2 = np.linalg.norm(vec1), np.linalg.norm(vec2)
             if norm1 == 0 or norm2 == 0: continue
-            
             cosine_sim = np.dot(vec1, vec2) / (norm1 * norm2)
-            
             if cosine_sim < OPPOSITE_NEIGHBOR_COS_SIM_THRESHOLD:
                 dist_sum = norm1 + norm2
                 if dist_sum < min_dist_sum:
-                    min_dist_sum = dist_sum
-                    best_pair = (n1_idx, n2_idx)
-
-        # Create edges from the optimal pair
+                    min_dist_sum, best_pair = dist_sum, (n1_idx, n2_idx)
         if best_pair:
-            heuristic_directed_edges.append((i, best_pair[0]))
-            heuristic_directed_edges.append((i, best_pair[1]))
+            heuristic_directed_edges.extend([(i, best_pair[0]), (i, best_pair[1])])
             
-    # Step 3.1: Heuristic Degree
     degrees = np.zeros(n_points, dtype=int)
     for u, v in heuristic_directed_edges:
         degrees[u] += 1
         degrees[v] += 1
-        
-    # Step 3.2: Overlap
+    
     edge_counts = Counter(heuristic_directed_edges)
     overlaps = []
     processed_edges = set()
     for u, v in heuristic_directed_edges:
-        # To avoid double counting, create a canonical representation (min, max)
         edge_key = tuple(sorted((u, v)))
         if edge_key not in processed_edges:
             overlap_val = edge_counts.get((u, v), 0) + edge_counts.get((v, u), 0)
             overlaps.append(overlap_val)
             processed_edges.add(edge_key)
 
-    return {
-        "heuristic_degree": degrees,
-        "overlap": np.array(overlaps)
-    }
+    return {"heuristic_degree": degrees, "overlap": np.array(overlaps)}
+
 
 def aggregate_statistics(all_page_stats: list) -> dict:
-    """Aggregates statistics from all pages into a single summary."""
-    logging.info("Aggregating statistics from all pages...")
+    """
+    HEAVILY UPGRADED: Aggregates statistics and calculates derived ratios.
+    1. Aggregates basic stats.
+    2. Calculates derived global ratios (Line/Char spacing).
+    3. Analyzes horizontal spacing bimodal distribution (Word/Char spacing).
+    4. Analyzes horizontal spacing vs. font size (Binned stats).
+    """
+    logging.info("Aggregating statistics and calculating derived ratios...")
     if not all_page_stats:
         logging.warning("No page statistics to aggregate.")
         return {}
 
-    # Initialize lists to collect all raw values from all pages
-    collated = {
-        'intra_line': defaultdict(list),
-        'inter_line': defaultdict(list),
-        'page_level': defaultdict(list),
-        'graph_based': defaultdict(list)
-    }
-
-    num_pages_processed = len(all_page_stats)
-
+    # --- Step 1: Collate all raw data from all pages ---
+    collated = defaultdict(list)
     for page_stat in all_page_stats:
-        # The `page_stat` object now only contains the stat categories
         for category, stats in page_stat.items():
-            # This check is now more robust. It ensures `stats` is a dictionary.
-            if not isinstance(stats, dict):
-                logging.warning(f"Skipping non-dictionary item '{category}' in aggregation.")
-                continue
-
+            if not isinstance(stats, dict): continue
             for stat_name, values in stats.items():
-                if isinstance(values, np.ndarray):
-                    collated[category][stat_name].append(values)
-                else: # For single-value page-level stats
-                    collated[category][stat_name].append(np.array([values]))
-
-    # Concatenate and describe the distributions
-    aggregated_summary = {}
-    for category, stats in collated.items():
-        aggregated_summary[category] = {}
-        for stat_name, list_of_arrays in stats.items():
-            # Check if there's anything to concatenate
-            if not list_of_arrays:
-                logging.warning(f"No data found for statistic '{stat_name}' in category '{category}'. Skipping.")
-                continue
-            
-            full_distribution = np.concatenate(list_of_arrays)
-            aggregated_summary[category][stat_name] = describe_distribution(full_distribution, f"{category}.{stat_name}")
+                if isinstance(values, np.ndarray) and values.size > 0:
+                    collated[f"{category}.{stat_name}"].append(values)
+                elif not isinstance(values, np.ndarray):
+                    collated[f"{category}.{stat_name}"].append(np.array([values]))
     
-    # Add a count of the number of pages processed
-    aggregated_summary['metadata'] = {'num_pages_processed': num_pages_processed}
+    # --- Step 2: Compute basic summary stats for all distributions ---
+    aggregated_summary = defaultdict(dict)
+    for key, list_of_arrays in collated.items():
+        category, stat_name = key.split('.', 1)
+        full_distribution = np.concatenate(list_of_arrays)
+        aggregated_summary[category][stat_name] = describe_distribution(full_distribution, key)
+    
+    # --- Step 3: Calculate derived global ratios ---
+    logging.info("Calculating derived global ratios...")
+    derived_ratios = {}
+    mean_rhs = aggregated_summary['intra_line']['rhs_with_font_size']['mean']
+    mean_rvs = aggregated_summary['inter_line']['relative_vertical_spacing']['mean']
+    
+    if mean_rhs > 0:
+        derived_ratios['line_spacing_to_char_spacing_ratio'] = mean_rvs / mean_rhs
+    else:
+        derived_ratios['line_spacing_to_char_spacing_ratio'] = float('nan')
+    
+    # --- Step 4: Analyze bimodal distribution of horizontal spacing (Word vs. Char) ---
+    logging.info("Analyzing word vs. character spacing...")
+    full_rhs_data = np.concatenate(collated['intra_line.rhs_with_font_size'])
+    # We only need the spacing values for this analysis
+    full_rhs_dist = full_rhs_data[:, 0].reshape(-1, 1)
 
+    try:
+        if len(full_rhs_dist) > 20: # Need enough data for GMM
+            gmm = GaussianMixture(n_components=2, random_state=42).fit(full_rhs_dist)
+            
+            # Identify which component is char and which is word based on mean
+            means = gmm.means_.flatten()
+            variances = gmm.covariances_.flatten()
+            weights = gmm.weights_.flatten()
+            
+            char_idx, word_idx = (0, 1) if means[0] < means[1] else (1, 0)
+
+            char_stats = {"mean": means[char_idx], "std": np.sqrt(variances[char_idx]), "weight": weights[char_idx]}
+            word_stats = {"mean": means[word_idx], "std": np.sqrt(variances[word_idx]), "weight": weights[word_idx]}
+
+            derived_ratios['word_spacing_analysis'] = {
+                'char_spacing_stats': char_stats,
+                'word_spacing_stats': word_stats,
+                'word_to_char_spacing_ratio': word_stats['mean'] / char_stats['mean']
+            }
+        else:
+            logging.warning("Not enough RHS data points to perform GMM analysis.")
+            derived_ratios['word_spacing_analysis'] = "Not enough data"
+    except Exception as e:
+        logging.error(f"GMM for word/char spacing failed: {e}")
+        derived_ratios['word_spacing_analysis'] = f"GMM failed: {e}"
+        
+    aggregated_summary['derived_ratios'] = derived_ratios
+    
+    # --- Step 5: Binned analysis of horizontal spacing vs. font size ---
+    logging.info("Performing binned analysis of RHS vs. font size...")
+    # Use full_rhs_data from Step 4: col 0 is RHS, col 1 is font size
+    font_sizes = full_rhs_data[:, 1]
+    rhs_values = full_rhs_data[:, 0]
+    
+    min_s, max_s = np.min(font_sizes), np.max(font_sizes)
+    bin_edges = np.linspace(min_s, max_s, NUM_FONT_BINS + 1)
+    
+    binned_stats = []
+    for i in range(NUM_FONT_BINS):
+        bin_start, bin_end = bin_edges[i], bin_edges[i+1]
+        
+        # Find indices of points where font size is in the current bin
+        mask = (font_sizes >= bin_start) & (font_sizes < bin_end)
+        # For the last bin, include the max value
+        if i == NUM_FONT_BINS - 1:
+            mask = (font_sizes >= bin_start) & (font_sizes <= bin_end)
+            
+        rhs_in_bin = rhs_values[mask]
+        
+        bin_summary = {
+            "font_size_bin_start": bin_start,
+            "font_size_bin_end": bin_end,
+            "font_size_bin_center": (bin_start + bin_end) / 2.0,
+            "stats": describe_distribution(rhs_in_bin, f"RHS for font bin {i+1}")
+        }
+        binned_stats.append(bin_summary)
+        
+    aggregated_summary['intra_line']['binned_rhs_by_font_size'] = binned_stats
+
+    # Final metadata
+    aggregated_summary['metadata'] = {'num_pages_processed': len(all_page_stats)}
+    
     return aggregated_summary
 
 
@@ -412,7 +405,6 @@ def main():
     
     args = parser.parse_args()
 
-    # Discover pages in the dataset directory
     try:
         files = os.listdir(args.dataset_path)
         page_ids = sorted(list(set([int(f.split('_')[0]) for f in files if f.split('_')[0].isdigit()])))
@@ -426,11 +418,9 @@ def main():
     
     for page_id in page_ids:
         dims, points, labels = load_page_data(page_id, args.dataset_path)
-        if dims is None:
-            continue
+        if dims is None: continue
         
-        # Pre-process data into a more usable structure
-        lines_data = defaultdict(lambda: {'points': [], 'indices': []})
+        lines_data = defaultdict(lambda: {'points': [], 'indices': [], 'label': None})
         for i, (point, label) in enumerate(zip(points, labels)):
             lines_data[label]['points'].append(point)
             lines_data[label]['indices'].append(i)
@@ -439,7 +429,6 @@ def main():
         for label in lines_data:
             lines_data[label]['points'] = np.array(lines_data[label]['points'])
 
-        # Calculate all statistics for the current page
         page_stats_data = {
             'intra_line': calculate_intra_line_stats(lines_data),
             'inter_line': calculate_inter_line_stats(points, lines_data, dims),
@@ -448,24 +437,20 @@ def main():
         }
         stats_for_aggregation.append(page_stats_data)
         
-        # Create a separate dictionary for JSON export that includes the page_id
         page_stats_with_id = {'page_id': page_id, **page_stats_data}
         all_page_raw_stats_for_json.append(page_stats_with_id)
     
-    # Save per-page raw statistics
     logging.info(f"Saving per-page statistics to '{args.output_per_page}'...")
     with open(args.output_per_page, 'w') as f:
         json.dump(all_page_raw_stats_for_json, f, cls=NumpyEncoder, indent=4)
 
-    # Aggregate and save summary statistics
-    # We now pass only the list of statistical dictionaries, without the page_id
     aggregated_stats = aggregate_statistics(stats_for_aggregation)
+    
     logging.info(f"Saving aggregated statistics to '{args.output_aggregated}'...")
     with open(args.output_aggregated, 'w') as f:
         json.dump(aggregated_stats, f, cls=NumpyEncoder, indent=4)
 
     logging.info("Processing complete.")
-
 
 if __name__ == '__main__':
     main()
