@@ -43,12 +43,9 @@ def generate_rejection_sampling_layout(config: Config, rng: np.random.Generator)
             max_placement_attempts = sample_from_distribution(config.rejection_sampling.max_placement_attempts, rng)
             placed = False
             for _ in range(max_placement_attempts):
+
                 textbox.position = (rng.uniform(0, page.width), rng.uniform(0, page.height))
-                
-                # --- Start of Fix ---
-                # This logic block ensures textbox.orientation_deg is always a number.
                 orientation_choice = sample_from_distribution(config.page_augmentations.orientation_deg, rng)
-                
                 final_orientation = 0.0
                 if orientation_choice == "other":
                     # Sample a base orientation and add a random offset from the 'other' range

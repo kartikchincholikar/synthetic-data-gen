@@ -116,6 +116,7 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
     """Helper to generate the raw text lines for a textbox, including interlinear glosses."""
     lines_per_box = sample_from_distribution(box_config.lines_per_box, rng)
     base_font_size = sample_from_distribution(box_config.font_size, rng)
+    # base_font_size = sample_from_distribution(box_config.font_size, rng)
     
     char_spacing = base_font_size * sample_from_distribution(content_config.character_spacing_factor, rng)
     word_spacing = char_spacing * sample_from_distribution(content_config.word_spacing_factor, rng)

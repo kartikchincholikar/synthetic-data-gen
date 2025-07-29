@@ -38,9 +38,9 @@ rejection_sampling:
   max_box_generation_attempts: { dist: "uniform_int", min: 2, max: 50 } # K attempts
   # Probability of generating different types of textboxes
   textbox_type_probabilities:
-    main_text: 0.60
-    marginalia: 0.25
-    page_number: 0.15
+    main_text: 0.80
+    marginalia: 0.15
+    page_number: 0.05
 
 
 # --- Layout Strategy: Grid ---
@@ -60,7 +60,7 @@ textbox_content:
   # Base parameters per textbox type
   main_text:
     font_size: { dist: "uniform_int", min: 35, max: 40 }
-    lines_per_box: { dist: "uniform_int", min: 20, max: 25 }
+    lines_per_box: { dist: "uniform_int", min: 8, max: 25 }
     words_per_line: { dist: "uniform_int", min: 1, max: 1 }
     alignment: { dist: "choice", choices: ["left", "right", "center", "justify"], weights: [0.4, 0.1, 0.1, 0.4] }
     interlinear_gloss_probability: 0.2 # Probability that any given line in this box will have a gloss
@@ -79,11 +79,11 @@ textbox_content:
     words_per_line: { dist: "uniform_int", min: 1, max: 1 }
     vertical_offset_factor: { dist: "uniform_float", min: 0.4, max: 0.8 }
 
-  chars_per_word: { dist: "uniform_int", min: 40, max: 50 }
-  # chars_per_word:
-  #   dist: "choice"
-  #   choices: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-  #   weights: [0.10, 0.15, 0.20, 0.15, 0.12, 0.08, 0.06, 0.05, 0.03, 0.02, 0.01, 0.01, 0.01]
+  # chars_per_word: { dist: "uniform_int", min: 40, max: 50 }
+  chars_per_word:
+    dist: "choice"
+    choices: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50]
+    weights: [0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.011627906976744186, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372, 0.023255813953488372]
   
   # Spacing is defined as a multiplier of the base font_size
   character_spacing_factor: { dist: "uniform_float", min: 0.8, max: 1.6 }
