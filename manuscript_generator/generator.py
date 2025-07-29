@@ -110,7 +110,7 @@ class SyntheticManuscriptGenerator:
         duration = time.time() - start_time
         print(f"\nDataset generation completed in {duration:.2f} seconds.")
         
-        self.print_summary_report()
+        # self.print_summary_report()
 
     def print_summary_report(self):
         """Prints an aggregate statistics report for the generated dataset."""
