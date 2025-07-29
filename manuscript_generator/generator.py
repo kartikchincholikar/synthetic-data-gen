@@ -39,9 +39,9 @@ class SyntheticManuscriptGenerator:
             
             # 3. Finalize and save each page
             for i, page in enumerate(pages):
-                sample_id = f"sample_{sample_index:06d}"
+                sample_id = f"{sample_index}"
                 if len(pages) > 1: # For ambiguous layouts like grid
-                    sample_id += f"_{i}"
+                    sample_id += f"{i}"
 
                 # Finalize (combine textboxes, apply phase 3 augs)
                 page.finalize(self.config, rng)
