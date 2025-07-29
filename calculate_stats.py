@@ -4,10 +4,10 @@ import logging
 import argparse
 from collections import defaultdict, Counter
 from itertools import combinations
+from sklearn.decomposition import PCA
 
 import numpy as np
 from scipy.spatial import KDTree
-from sklearn.linear_model import RANSACRegressor
 from sklearn.mixture import GaussianMixture # New import
 
 # --- Configuration ---
@@ -95,13 +95,15 @@ def load_page_data(page_id: int, base_path: str) -> (dict, np.ndarray, np.ndarra
 
 # --- Core Statistical Calculation Functions ---
 
+
+
 def calculate_intra_line_stats(lines_data: dict) -> dict:
     """
     Calculates statistics that exist *within* each text line.
+    - MODIFIED: Vertical Baseline Jitter now uses PCA for rotation invariance.
     - MODIFIED: Now returns RHS paired with its associated font size.
     """
     logging.info("Calculating intra-line statistics...")
-    # MODIFICATION: We now store pairs of (RHS, avg_font_size)
     rhs_with_font_size = []
     all_jitter, all_font_size_cv, all_angles = [], [], []
 
@@ -110,17 +112,20 @@ def calculate_intra_line_stats(lines_data: dict) -> dict:
         n_points = len(points)
         
         if n_points < 2:
-            logging.warning(f"Line {line_label} has < 2 points. Skipping spacing/angle/jitter calculations.")
+            logging.warning(f"Line {line_label} has < 2 points. Skipping all calculations.")
             continue
 
+        # 1. Intra-Line Font Size Variation
         font_sizes = points[:, 2]
         if np.mean(font_sizes) > 0:
             cv = np.std(font_sizes) / np.mean(font_sizes)
             all_font_size_cv.append(cv)
 
+        # Build KD-Tree for efficient intra-line neighbor search
         line_kdtree = KDTree(points[:, :2])
         distances, indices = line_kdtree.query(points[:, :2], k=2)
 
+        # 2. Relative Horizontal Spacing & 3. Local Writing Angle
         for i in range(n_points):
             neighbor_idx = indices[i, 1]
             p1 = points[i]
@@ -129,26 +134,38 @@ def calculate_intra_line_stats(lines_data: dict) -> dict:
             s_avg = (p1[2] + p2[2]) / 2.0
             
             if s_avg > 0:
-                # MODIFICATION: Store the pair
                 rhs_with_font_size.append((dist / s_avg, s_avg))
 
             dx = p2[0] - p1[0]
             dy = p2[1] - p1[1]
             all_angles.append(np.arctan2(dy, dx))
             
-        X = points[:, 0].reshape(-1, 1)
-        y = points[:, 1]
+        # 4. Vertical Baseline Jitter (using PCA for rotation invariance)
+        xy_coords = points[:, :2]
         try:
-            ransac = RANSACRegressor(random_state=42)
-            ransac.fit(X, y)
-            y_pred = ransac.predict(X)
-            residuals = y - y_pred
-            jitter = residuals / points[:, 2]
+            # Fit PCA to find the principal axis of the text line
+            pca = PCA(n_components=2)
+            pca.fit(xy_coords)
+            
+            # The second principal component is the direction of the jitter (perpendicular to the line)
+            jitter_vector = pca.components_[1]
+            
+            # Center the data
+            centered_coords = xy_coords - pca.mean_
+            
+            # Project the centered coordinates onto the jitter vector.
+            # The result is the signed perpendicular distance from the baseline.
+            perpendicular_distances = np.dot(centered_coords, jitter_vector)
+            
+            # Normalize jitter by font size
+            # Use np.maximum to avoid division by zero
+            jitter = perpendicular_distances / np.maximum(points[:, 2], 1e-6)
             all_jitter.extend(jitter.tolist())
-        except ValueError as e:
-            logging.warning(f"Could not fit RANSAC for line {line_label} (n_points={n_points}): {e}")
+            
+        except Exception as e:
+            # PCA can fail if all points are identical, which is an edge case.
+            logging.warning(f"Could not perform PCA for line {line_label} (n_points={n_points}): {e}")
 
-    # MODIFICATION: Return the structured array
     return {
         "rhs_with_font_size": np.array(rhs_with_font_size),
         "vertical_baseline_jitter": np.array(all_jitter),

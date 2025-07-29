@@ -59,8 +59,8 @@ grid_layout:
 textbox_content:
   # Base parameters per textbox type
   main_text:
-    font_size: { dist: "uniform_int", min: 4, max: 40 }
-    lines_per_box: { dist: "uniform_int", min: 5, max: 25 }
+    font_size: { dist: "uniform_int", min: 35, max: 40 }
+    lines_per_box: { dist: "uniform_int", min: 20, max: 25 }
     words_per_line: { dist: "uniform_int", min: 1, max: 1 }
     alignment: { dist: "choice", choices: ["left", "right", "center", "justify"], weights: [0.4, 0.1, 0.1, 0.4] }
     interlinear_gloss_probability: 0.2 # Probability that any given line in this box will have a gloss
@@ -86,7 +86,7 @@ textbox_content:
   #   weights: [0.10, 0.15, 0.20, 0.15, 0.12, 0.08, 0.06, 0.05, 0.03, 0.02, 0.01, 0.01, 0.01]
   
   # Spacing is defined as a multiplier of the base font_size
-  character_spacing_factor: { dist: "uniform_float", min: 1.0, max: 1.6 }
+  character_spacing_factor: { dist: "uniform_float", min: 0.8, max: 1.6 }
   # word_spacing_factor: { dist: "uniform_float", min: 2.0, max: 4.0 }
   # line_spacing_factor: { dist: "uniform_float", min: 1.5, max: 3.0 }
 
@@ -104,10 +104,12 @@ textbox_content:
   font_size_variation:
     enabled: true
     variation_factor: { dist: "normal", mean: 0.0, std: 0.25 } # Multiplicative factor
+
   point_level_jitter:
     enabled: true
     # Jitter is relative to font size
     jitter_std_factor: { dist: "uniform_float", min: 0.05, max: 0.15 }
+
   congestion_jitter:
     enabled: true
     # Percentage of points to be heavily jittered
