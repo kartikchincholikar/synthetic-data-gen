@@ -120,9 +120,12 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
     
     char_spacing = base_font_size * sample_from_distribution(content_config.character_spacing_factor, rng)
     word_spacing = char_spacing * sample_from_distribution(content_config.word_spacing_factor, rng)
-    # word_spacing = base_font_size * sample_from_distribution(content_config.word_spacing_factor, rng)
     line_spacing = char_spacing * sample_from_distribution(content_config.line_spacing_factor, rng)
+    line_break_probability = sample_from_distribution(content_config.line_break_probability, rng)
+    # word_spacing = base_font_size * sample_from_distribution(content_config.word_spacing_factor, rng)
     # line_spacing = base_font_size * sample_from_distribution(content_config.line_spacing_factor, rng)
+
+    
 
     
 
@@ -133,15 +136,27 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
     # Check if this textbox type can have glosses
     has_gloss_prob = getattr(box_config, 'interlinear_gloss_probability', 0)
     
+    words_per_line = sample_from_distribution(box_config.words_per_line, rng) # for sanskrit, this is always 1
     for _ in range(lines_per_box):
         # --- Generate the main line of text ---
-        words_per_line = sample_from_distribution(box_config.words_per_line, rng)
+        
         current_x = 0
         main_words = []
         for _ in range(words_per_line):
             # chars_in_word = sample_from_distribution(content_config.chars_per_word, rng)
-            points = [Point(x=current_x + i * char_spacing, y=current_y, font_size=base_font_size) for i in range(chars_in_word)]
-            current_x += (chars_in_word * char_spacing) + word_spacing
+            # points = [Point(x=current_x + i * char_spacing, y=current_y, font_size=base_font_size) for i in range(chars_in_word)]
+            points = []
+            if rng.random() > line_break_probability:
+                for i in range(chars_in_word):
+                    points.append(Point(x=current_x + i * char_spacing, y=current_y, font_size=base_font_size))
+                current_x += (chars_in_word * char_spacing) + word_spacing
+            else:
+                random_chars = rng.integers(0, chars_in_word-1)
+                for i in range(chars_in_word-random_chars):
+                    points.append(Point(x=current_x + i * char_spacing, y=current_y, font_size=base_font_size))
+
+                current_x += ((chars_in_word-random_chars) * char_spacing) + word_spacing
+                
             main_words.append(Word(points=points))
         
         line_width = current_x - word_spacing
@@ -167,9 +182,9 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
             gloss_words_per_line = sample_from_distribution(gloss_config.words_per_line, rng)
             for _ in range(gloss_words_per_line):
                 # chars_in_word = sample_from_distribution(content_config.chars_per_word, rng)
-                chars_in_word = sample_from_distribution(gloss_config.chars_per_word, rng)
-                points = [Point(x=gloss_current_x + i * gloss_char_spacing, y=gloss_y, font_size=gloss_font_size) for i in range(chars_in_word)]
-                gloss_current_x += (chars_in_word * gloss_char_spacing) + gloss_word_spacing
+                chars_in_word_gloss = sample_from_distribution(gloss_config.chars_per_word, rng)
+                points = [Point(x=gloss_current_x + i * gloss_char_spacing, y=gloss_y, font_size=gloss_font_size) for i in range(chars_in_word_gloss)]
+                gloss_current_x += (chars_in_word_gloss * gloss_char_spacing) + gloss_word_spacing
                 gloss_words.append(Word(points=points))
 
             text_line.interlinear_gloss = gloss_words

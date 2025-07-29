@@ -50,7 +50,6 @@ class Page:
                 all_textline_labels.append(np.full(box.points_global.shape[0], global_line_id_offset))
                 global_line_id_offset += 1
 
-
         if not all_points:
             return
             
@@ -61,11 +60,8 @@ class Page:
         # Apply Phase 3 augmentations (e.g., Point Dropout)
         from manuscript_generator.core.registry import AUGMENTATIONS
         
-        # --- Start of Fix ---
-        # Call with a placeholder 'None' for the context argument to match the unified signature.
+
         self.points, kept_indices = AUGMENTATIONS['point_dropout'](self.points, None, config, rng)
-        # --- End of Fix ---
-        
         self.textbox_labels = self.textbox_labels[kept_indices]
         self.textline_labels = self.textline_labels[kept_indices]
         
