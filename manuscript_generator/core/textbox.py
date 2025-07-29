@@ -116,6 +116,7 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
     """Helper to generate the raw text lines for a textbox, including interlinear glosses."""
     lines_per_box = sample_from_distribution(box_config.lines_per_box, rng)
     base_font_size = sample_from_distribution(box_config.font_size, rng)
+    chars_in_word = sample_from_distribution(box_config.chars_per_word, rng)
     
     char_spacing = base_font_size * sample_from_distribution(content_config.character_spacing_factor, rng)
     word_spacing = char_spacing * sample_from_distribution(content_config.word_spacing_factor, rng)
@@ -123,20 +124,22 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
     line_spacing = char_spacing * sample_from_distribution(content_config.line_spacing_factor, rng)
     # line_spacing = base_font_size * sample_from_distribution(content_config.line_spacing_factor, rng)
 
+    
+
     text_lines = []
     max_line_width = 0
     current_y = 0
     
     # Check if this textbox type can have glosses
     has_gloss_prob = getattr(box_config, 'interlinear_gloss_probability', 0)
-
+    
     for _ in range(lines_per_box):
         # --- Generate the main line of text ---
         words_per_line = sample_from_distribution(box_config.words_per_line, rng)
         current_x = 0
         main_words = []
         for _ in range(words_per_line):
-            chars_in_word = sample_from_distribution(content_config.chars_per_word, rng)
+            # chars_in_word = sample_from_distribution(content_config.chars_per_word, rng)
             points = [Point(x=current_x + i * char_spacing, y=current_y, font_size=base_font_size) for i in range(chars_in_word)]
             current_x += (chars_in_word * char_spacing) + word_spacing
             main_words.append(Word(points=points))
@@ -163,7 +166,8 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
             gloss_current_x = 0 # Gloss is left-aligned relative to the line start
             gloss_words_per_line = sample_from_distribution(gloss_config.words_per_line, rng)
             for _ in range(gloss_words_per_line):
-                chars_in_word = sample_from_distribution(content_config.chars_per_word, rng)
+                # chars_in_word = sample_from_distribution(content_config.chars_per_word, rng)
+                chars_in_word = sample_from_distribution(gloss_config.chars_per_word, rng)
                 points = [Point(x=gloss_current_x + i * gloss_char_spacing, y=gloss_y, font_size=gloss_font_size) for i in range(chars_in_word)]
                 gloss_current_x += (chars_in_word * gloss_char_spacing) + gloss_word_spacing
                 gloss_words.append(Word(points=points))

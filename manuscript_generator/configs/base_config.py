@@ -67,11 +67,14 @@ class TextBoxContentParams(BaseModel):
     words_per_line: AnyDist
     alignment: AnyDist
     interlinear_gloss_probability: float = 0.0 # Add with a default value
+    chars_per_word: AnyDist
+
 
 class InterlinearGlossConfig(BaseModel):
     font_size_factor: AnyDist
     words_per_line: AnyDist
     vertical_offset_factor: AnyDist
+    chars_per_word: AnyDist
 
 class TextBoxContentConfig(BaseModel):
     main_text: TextBoxContentParams
@@ -85,7 +88,6 @@ class TextBoxContentConfig(BaseModel):
     font_size_variation: Dict[str, Any]
     point_level_jitter: Dict[str, Any]
     congestion_jitter: Dict[str, Any]
-    chars_per_word: AnyDist
     interlinear_gloss: InterlinearGlossConfig
 
 class DistortionAugmentationConfig(BaseModel):
