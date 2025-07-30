@@ -25,22 +25,19 @@ page:
     dist: "choice"
     choices:
       - "rejection_sampling"
-      - "rejection_sampling"
-      - "rejection_sampling"
-      - "rejection_sampling"
-      - "grid" # Make grid layout less frequent
-    weights: [0.2, 0.2, 0.2, 0.2, 0.2] # Example of uniform weights
+      # - "grid" # Make grid layout less frequent
+    weights: [1.0] # Example of uniform weights
 
 # --- Layout Strategy: Rejection Sampling ---
 rejection_sampling:
   num_textboxes: { dist: "uniform_int", min: 1, max: 10 }
   max_placement_attempts: { dist: "uniform_int", min: 5, max: 50 } # N attempts
   max_box_generation_attempts: { dist: "uniform_int", min: 2, max: 50 } # K attempts
-  # Probability of generating different types of textboxes
   textbox_type_probabilities:
-    main_text: 0.80
-    marginalia: 0.15
-    page_number: 0.05
+    main_text: 0.50
+    marginalia: 0.40
+    page_number: 0.10
+
 
 
 # --- TextBox Content & Micro-Variations (Phase 1) ---

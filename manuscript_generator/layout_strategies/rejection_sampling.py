@@ -22,17 +22,18 @@ def generate_rejection_sampling_layout(config: Config, rng: np.random.Generator)
     page = Page(width=page_width, height=page_height)
 
     num_textboxes = sample_from_distribution(config.rejection_sampling.num_textboxes, rng)
-    
     box_types_config = config.rejection_sampling.textbox_type_probabilities
     types_to_generate = rng.choice(
         list(box_types_config.keys()),
         size=num_textboxes,
         p=list(box_types_config.values())
     )
+    # types_to_generate.insert(0,"main_text")  
+    types_to_generate = np.insert(types_to_generate, 0, "main_text")
     
-    for box_type_str in types_to_generate:
+    for i, box_type_str in enumerate(types_to_generate):
         box_type = TextBoxType(box_type_str)
-        
+    
         max_box_attempts = sample_from_distribution(config.rejection_sampling.max_box_generation_attempts, rng)
         
         for _ in range(max_box_attempts):
