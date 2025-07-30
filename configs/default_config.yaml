@@ -44,7 +44,7 @@ rejection_sampling:
 textbox_content:
   # Base parameters per textbox type
   main_text:
-    font_size: { dist: "uniform_int", min: 30, max: 40 }
+    font_size: { dist: "uniform_int", min: 15, max: 30 } #our manuscript actually don't have this big font size
     lines_per_box: { dist: "uniform_int", min: 8, max: 25 }
     words_per_line: { dist: "uniform_int", min: 1, max: 1 }
     chars_per_word: { dist: "uniform_int", min: 30, max: 50 }
@@ -53,7 +53,7 @@ textbox_content:
     
 
   interlinear_gloss:
-    font_size_factor: { dist: "uniform_float", min: 0.1, max: 0.6 } 
+    font_size_factor: { dist: "uniform_float", min: 0.1, max: 0.5 } 
     words_per_line: { dist: "uniform_int", min: 1, max: 3 }
     vertical_offset_factor: { dist: "uniform_float", min: 0.4, max: 0.8 }
     chars_per_word: { dist: "uniform_int", min: 2, max: 10 }
@@ -66,7 +66,7 @@ textbox_content:
     alignment: { dist: "choice", choices: ["left", "right"], weights: [0.7, 0.3] }
     
   page_number:
-    font_size: { dist: "uniform_int", min: 3, max: 40 }
+    font_size: { dist: "uniform_int", min: 3, max: 30 }
     lines_per_box: { dist: "constant", value: 1 }
     words_per_line: { dist: "uniform_int", min: 1, max: 2 }
     chars_per_word: { dist: "uniform_int", min: 2, max: 8 }
@@ -76,10 +76,10 @@ textbox_content:
 
   
   # Spacing is defined as a multiplier of the base font_size
-  character_spacing_factor: { dist: "uniform_float", min: 0.9, max: 1.6 }
+  character_spacing_factor: { dist: "uniform_float", min: 1.0, max: 2 } # we might need to increase this to match 'binned_rhs_by_font_size' 
    # Spacing is defined as a multiplier of character spacing
   word_spacing_factor: { dist: "uniform_float", min: 1.4, max: 2.0 }
-  line_spacing_factor: { dist: "uniform_float", min: 1.1, max: 2.0 }
+  line_spacing_factor: { dist: "uniform_float", min: 1.1, max: 3.0 }
 
 
   # Line Breaks
@@ -88,7 +88,7 @@ textbox_content:
   # Augmentations (Phase 1)
   font_size_variation:
     enabled: true
-    variation_factor: { dist: "normal", mean: 0.0, std: 0.25 } # Multiplicative factor
+    variation_factor: { dist: "normal", mean: 0.0, std: 0.1 } # Multiplicative factor. Might need to tweak
 
   point_level_jitter:
     enabled: true
