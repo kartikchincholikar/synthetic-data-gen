@@ -117,6 +117,8 @@ class LinearCreaseConfig(DistortionAugmentationConfig):
     angle_deg: AnyDist
     position_factor: AnyDist
     crease_width_factor: AnyDist # <-- ADD THIS LINE
+    crease_center_x_factor: AnyDist # Horizontal center of the crease
+    crease_length_factor: AnyDist # Length of the crease
 # --- END NEW ---
 
 class TextBoxDistortionConfig(BaseModel):

@@ -61,9 +61,9 @@ def apply_warp_curl(points: np.ndarray, textbox: TextBox, config: Config, rng: n
 def apply_linear_crease(points: np.ndarray, textbox: TextBox, config: Config, rng: np.random.Generator) -> np.ndarray:
     """
     Applies one or more sequential Gaussian "creases" to the textbox,
-    creating a localized dent/trough to simulate a fold in the paper.
+    creating a localized dent/trough to simulate a finite fold in the paper.
     """
-    if textbox.height is None or textbox.height <= 0:
+    if textbox.height is None or textbox.height <= 0 or textbox.width is None or textbox.width <= 0:
         return points
 
     aug_config = config.textbox_distortion.linear_crease
@@ -72,44 +72,49 @@ def apply_linear_crease(points: np.ndarray, textbox: TextBox, config: Config, rn
     current_points = points.copy()
 
     for _ in range(num_creases):
-        # Sample parameters for this specific crease
+        # Sample all parameters for this crease
         strength_factor = sample_from_distribution(aug_config.strength, rng)
         angle_deg = sample_from_distribution(aug_config.angle_deg, rng)
         position_factor = sample_from_distribution(aug_config.position_factor, rng)
-        width_factor = sample_from_distribution(aug_config.crease_width_factor, rng) # <-- GET NEW PARAM
+        width_factor = sample_from_distribution(aug_config.crease_width_factor, rng)
+        center_x_factor = sample_from_distribution(aug_config.crease_center_x_factor, rng)
+        length_factor = sample_from_distribution(aug_config.crease_length_factor, rng)
 
         # 1. Define the crease line
         angle_rad = np.deg2rad(angle_deg)
         y_intercept = (textbox.height / 2) * position_factor
 
-        # Line equation: Ax + By + C = 0
         A = np.sin(angle_rad)
         B = -np.cos(angle_rad)
         C = y_intercept * np.cos(angle_rad)
 
         px, py = current_points[:, 0], current_points[:, 1]
 
-        # 2. Calculate signed perpendicular distance of each point to the line
-        distances = A * px + B * py + C
+        # 2. Calculate perpendicular distance for vertical falloff
+        distances_perp = A * px + B * py + C
+        sigma_perp = textbox.height * width_factor
+        if sigma_perp < 1e-6: continue
+        vertical_falloff = np.exp(-(distances_perp**2) / (2 * sigma_perp**2))
 
-        # --- LOGIC CHANGE: From Quadratic to Gaussian ---
-        # 3. Calculate displacement magnitude using a Gaussian falloff
+        # --- NEW LOGIC: Calculate horizontal falloff for crease length ---
+        # Define the horizontal center of the crease
+        center_x = (textbox.width / 2) * center_x_factor
         
-        # Max displacement in pixels (strength is a factor of height)
+        # Calculate horizontal distance from each point to the crease's center
+        distances_para = px - center_x
+        
+        # Sigma for the horizontal Gaussian defines the crease length
+        sigma_para = textbox.width * length_factor
+        if sigma_para < 1e-6: continue
+        horizontal_falloff = np.exp(-(distances_para**2) / (2 * sigma_para**2))
+        # --- END NEW LOGIC ---
+        
+        # 3. Combine falloffs and calculate total displacement
+        total_falloff = vertical_falloff * horizontal_falloff
         max_displacement = textbox.height * strength_factor
-        
-        # Sigma defines the width of the crease (width_factor is a factor of height)
-        sigma = textbox.height * width_factor
-        
-        # Avoid division by zero for very narrow creases
-        if sigma < 1e-6:
-            continue
-            
-        # Gaussian function: Strength * e^(-d^2 / 2*sigma^2)
-        displacement_magnitude = max_displacement * np.exp(-(distances**2) / (2 * sigma**2))
-        # --- END OF LOGIC CHANGE ---
+        displacement_magnitude = max_displacement * total_falloff
 
-        # 4. Calculate the displacement vector for each point
+        # 4. Calculate the displacement vector (always perpendicular to the crease)
         disp_x = displacement_magnitude * A
         disp_y = displacement_magnitude * B
 
