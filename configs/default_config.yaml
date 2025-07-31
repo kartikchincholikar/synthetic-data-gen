@@ -49,16 +49,16 @@ textbox_content:
     words_per_line: { dist: "uniform_int", min: 1, max: 1 }
     chars_per_word: { dist: "uniform_int", min: 30, max: 50 }
     alignment: { dist: "choice", choices: ["left", "right", "center", "justify"], weights: [0.4, 0.1, 0.1, 0.4] }
-    interlinear_gloss_probability: 0.2 # Probability that any given line in this box will have a gloss
+    interlinear_gloss_probability: 0.08 # Probability that any given line in this box will have a gloss
     
 
   interlinear_gloss:
     font_size_factor: { dist: "uniform_float", min: 0.1, max: 0.5 } 
     words_per_line: { dist: "uniform_int", min: 1, max: 3 }
-    vertical_offset_factor: { dist: "uniform_float", min: 0.2, max: 0.6 }
+    vertical_offset_factor: { dist: "uniform_float", min: 0.3, max: 0.6 }
     chars_per_word: { dist: "uniform_int", min: 2, max: 10 }
     placement: { dist: "choice", choices: ["above", "below", "both"], weights: [0.4, 0.4, 0.2] }
-    character_spacing_multiplier: { dist: "uniform_float", min: 1.0, max: 2.5 }
+    character_spacing_multiplier: { dist: "uniform_float", min: 1.0, max: 2 }
 
   marginalia:
     font_size: { dist: "uniform_int", min: 3, max: 30 }

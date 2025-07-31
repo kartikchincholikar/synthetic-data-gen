@@ -39,25 +39,35 @@ class TextBox:
         points_list = []
         line_ids_list = []
         
-        for line_idx, text_line in enumerate(self.text_lines):
-            # Add points from the main line
-            for word in text_line.words:
-                for point in word.points:
-                    points_list.append([point.x, point.y, point.font_size])
-                    line_ids_list.append(line_idx)
-            
-            # Add points from BOTH gloss locations
+        # --- MODIFIED LOGIC: Use a running counter for instance IDs ---
+        # This ensures each main line and each gloss gets a unique ID.
+        current_instance_id = 0
+        
+        for text_line in self.text_lines:
+            # 1. Process the main line of text
+            if text_line.words:
+                for word in text_line.words:
+                    for point in word.points:
+                        points_list.append([point.x, point.y, point.font_size])
+                        line_ids_list.append(current_instance_id)
+                current_instance_id += 1 # Increment ID after processing the entity
+
+            # 2. Process the gloss above, if it exists
             if text_line.interlinear_gloss_above:
                 for word in text_line.interlinear_gloss_above:
                     for point in word.points:
                         points_list.append([point.x, point.y, point.font_size])
-                        line_ids_list.append(line_idx) 
+                        line_ids_list.append(current_instance_id)
+                current_instance_id += 1 # Increment ID after processing the entity
 
+            # 3. Process the gloss below, if it exists
             if text_line.interlinear_gloss_below:
                 for word in text_line.interlinear_gloss_below:
                     for point in word.points:
                         points_list.append([point.x, point.y, point.font_size])
-                        line_ids_list.append(line_idx)
+                        line_ids_list.append(current_instance_id)
+                current_instance_id += 1 # Increment ID after processing the entity
+        # --- END MODIFICATION ---
 
         if not points_list:
             self.points_local = np.empty((0, 3))
@@ -79,6 +89,7 @@ class TextBox:
         
         assert self.points_local.shape[0] == self.line_ids_local.shape[0]
         assert self.points_local.shape[1] == 3
+
 
     def apply_augmentations(self, config: Config, rng: np.random.Generator):
         """Applies Phase 1 and 2 augmentations to the local point cloud."""
