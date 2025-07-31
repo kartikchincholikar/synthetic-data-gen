@@ -2,6 +2,7 @@
 from pydantic import BaseModel, Field
 from typing import Dict, Any, List, Union, Literal
 
+# ... (keep all existing class definitions: Distribution, UniformInt, etc.) ...
 class Distribution(BaseModel):
     dist: str
 
@@ -109,10 +110,22 @@ class WarpCurlConfig(DistortionAugmentationConfig):
     phase_x: AnyDist
     phase_y: AnyDist
 
+# --- NEW: Add the config model for our new augmentation ---
+class LinearCreaseConfig(DistortionAugmentationConfig):
+    num_creases: AnyDist
+    strength: AnyDist
+    angle_deg: AnyDist
+    position_factor: AnyDist
+    crease_width_factor: AnyDist # <-- ADD THIS LINE
+# --- END NEW ---
+
 class TextBoxDistortionConfig(BaseModel):
     shear: ShearConfig
     stretch: StretchConfig
     warp_curl: WarpCurlConfig
+    # --- NEW: Add the new config to the main distortion model ---
+    linear_crease: LinearCreaseConfig
+    # --- END NEW ---
 
 class PageAugmentationsConfig(BaseModel):
     orientation_deg: AnyDist

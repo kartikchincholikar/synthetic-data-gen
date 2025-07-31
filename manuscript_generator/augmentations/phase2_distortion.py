@@ -56,3 +56,65 @@ def apply_warp_curl(points: np.ndarray, textbox: TextBox, config: Config, rng: n
     points[:, 0] = new_x
     points[:, 1] = new_y
     return points
+
+@register_augmentation("linear_crease")
+def apply_linear_crease(points: np.ndarray, textbox: TextBox, config: Config, rng: np.random.Generator) -> np.ndarray:
+    """
+    Applies one or more sequential Gaussian "creases" to the textbox,
+    creating a localized dent/trough to simulate a fold in the paper.
+    """
+    if textbox.height is None or textbox.height <= 0:
+        return points
+
+    aug_config = config.textbox_distortion.linear_crease
+    num_creases = sample_from_distribution(aug_config.num_creases, rng)
+
+    current_points = points.copy()
+
+    for _ in range(num_creases):
+        # Sample parameters for this specific crease
+        strength_factor = sample_from_distribution(aug_config.strength, rng)
+        angle_deg = sample_from_distribution(aug_config.angle_deg, rng)
+        position_factor = sample_from_distribution(aug_config.position_factor, rng)
+        width_factor = sample_from_distribution(aug_config.crease_width_factor, rng) # <-- GET NEW PARAM
+
+        # 1. Define the crease line
+        angle_rad = np.deg2rad(angle_deg)
+        y_intercept = (textbox.height / 2) * position_factor
+
+        # Line equation: Ax + By + C = 0
+        A = np.sin(angle_rad)
+        B = -np.cos(angle_rad)
+        C = y_intercept * np.cos(angle_rad)
+
+        px, py = current_points[:, 0], current_points[:, 1]
+
+        # 2. Calculate signed perpendicular distance of each point to the line
+        distances = A * px + B * py + C
+
+        # --- LOGIC CHANGE: From Quadratic to Gaussian ---
+        # 3. Calculate displacement magnitude using a Gaussian falloff
+        
+        # Max displacement in pixels (strength is a factor of height)
+        max_displacement = textbox.height * strength_factor
+        
+        # Sigma defines the width of the crease (width_factor is a factor of height)
+        sigma = textbox.height * width_factor
+        
+        # Avoid division by zero for very narrow creases
+        if sigma < 1e-6:
+            continue
+            
+        # Gaussian function: Strength * e^(-d^2 / 2*sigma^2)
+        displacement_magnitude = max_displacement * np.exp(-(distances**2) / (2 * sigma**2))
+        # --- END OF LOGIC CHANGE ---
+
+        # 4. Calculate the displacement vector for each point
+        disp_x = displacement_magnitude * A
+        disp_y = displacement_magnitude * B
+
+        # 5. Apply the displacement
+        current_points[:, 0] += disp_x
+        current_points[:, 1] += disp_y
+
+    return current_points

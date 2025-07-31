@@ -104,6 +104,7 @@ textbox_content:
 
 
 # --- TextBox Geometric Distortion (Phase 2) ---
+# --- TextBox Geometric Distortion (Phase 2) ---
 textbox_distortion:
   # Each distortion has a probability of being applied
   shear:
@@ -126,6 +127,21 @@ textbox_distortion:
     frequency_factor_y: { dist: "uniform_float", min: 0.5, max: 1.2 }
     phase_x: { dist: "uniform_float", min: 0.0, max: 6.28 } # 2*pi
     phase_y: { dist: "uniform_float", min: 0.0, max: 6.28 }
+    
+  # --- NEW: Configuration for the linear crease augmentation ---
+  linear_crease:
+    enabled: true
+    probability: 1
+    num_creases: { dist: "uniform_int", min: 1, max: 2 }
+    # Strength of the dent, as a fraction of the textbox height. Negative pulls inward.
+    strength: { dist: "uniform_float", min: -0.3, max: -0.1 } # <-- ADJUSTED RANGE
+    # Angle of the crease in degrees.
+    angle_deg: { dist: "uniform_float", min: -5.0, max: 5.0 }
+    # Vertical position of the crease's center.
+    position_factor: { dist: "uniform_float", min: -0.45, max: 0.45 }
+    # Width of the crease, as a fraction of the textbox height.
+    crease_width_factor: { dist: "uniform_float", min: 0.05, max: 0.2 } # <-- ADD THIS BLOCK
+  # --- END NEW ---
 
 # --- Page-Level Augmentations (Phase 3) ---
 page_augmentations:
