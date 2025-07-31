@@ -76,7 +76,7 @@ textbox_content:
 
   
   # Spacing is defined as a multiplier of the base font_size
-  character_spacing_factor: { dist: "uniform_float", min: 1.0, max: 2 } # we might need to increase this to match 'binned_rhs_by_font_size' 
+  character_spacing_factor: { dist: "uniform_float", min: 1.0, max: 4 } # we might need to increase this to match 'binned_rhs_by_font_size' 
    # Spacing is defined as a multiplier of character spacing
   word_spacing_factor: { dist: "uniform_float", min: 1.4, max: 2.0 }
   line_spacing_factor: { dist: "uniform_float", min: 1.1, max: 3.0 }
