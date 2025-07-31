@@ -37,4 +37,5 @@ class Word:
 class TextLine:
     """A collection of Word objects."""
     words: List[Word] = field(default_factory=list)
-    interlinear_gloss: Optional[List[Word]] = None
+    interlinear_gloss_above: Optional[List[Word]] = None
+    interlinear_gloss_below: Optional[List[Word]] = None

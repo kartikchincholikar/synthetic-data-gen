@@ -76,6 +76,8 @@ class InterlinearGlossConfig(BaseModel):
     words_per_line: AnyDist
     vertical_offset_factor: AnyDist
     chars_per_word: AnyDist
+    placement: AnyDist
+    character_spacing_multiplier: AnyDist
 
 class TextBoxContentConfig(BaseModel):
     main_text: TextBoxContentParams

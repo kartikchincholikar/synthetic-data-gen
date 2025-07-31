@@ -11,6 +11,7 @@ from manuscript_generator.utils.distribution_sampler import sample_from_distribu
 from manuscript_generator.utils.geometry import get_convex_hull, get_rotation_matrix, apply_transform
 from manuscript_generator.core.registry import AUGMENTATIONS
 
+# ... (TextBox class and its methods are unchanged) ...
 @dataclass
 class TextBox:
     """
@@ -45,14 +46,19 @@ class TextBox:
                     points_list.append([point.x, point.y, point.font_size])
                     line_ids_list.append(line_idx)
             
-            # --- NEW: Add points from the interlinear gloss, if it exists ---
-            if text_line.interlinear_gloss:
-                for word in text_line.interlinear_gloss:
+            # Add points from BOTH gloss locations
+            if text_line.interlinear_gloss_above:
+                for word in text_line.interlinear_gloss_above:
                     for point in word.points:
                         points_list.append([point.x, point.y, point.font_size])
-                        # The gloss belongs to the same logical textline
+                        line_ids_list.append(line_idx) 
+
+            if text_line.interlinear_gloss_below:
+                for word in text_line.interlinear_gloss_below:
+                    for point in word.points:
+                        points_list.append([point.x, point.y, point.font_size])
                         line_ids_list.append(line_idx)
-        
+
         if not points_list:
             self.points_local = np.empty((0, 3))
             self.line_ids_local = np.empty((0,), dtype=int)
@@ -63,7 +69,6 @@ class TextBox:
         self.points_local = np.array(points_list, dtype=np.float64)
         self.line_ids_local = np.array(line_ids_list, dtype=int)
 
-        # Center the points at (0,0) in their local coordinate system
         min_coords = np.min(self.points_local[:, :2], axis=0)
         max_coords = np.max(self.points_local[:, :2], axis=0)
         self.width = max_coords[0] - min_coords[0]
@@ -112,6 +117,58 @@ class TextBox:
         # 3. Update convex hull in global coordinates
         self.hull_global = get_convex_hull(self.points_global)
 
+# --- MODIFICATION: Function signature now accepts main_char_spacing ---
+def _create_one_gloss_line(
+    base_y: float,
+    y_sign: int,
+    main_line_width: float,
+    main_char_spacing: float, # <-- ADD THIS
+    line_spacing: float,
+    base_font_size: float,
+    content_config: Config,
+    rng: np.random.Generator
+) -> List[Word]:
+    """Generates the words for a single gloss line, placed at a random horizontal offset."""
+    gloss_config = content_config.interlinear_gloss
+    
+    gloss_font_size = base_font_size * sample_from_distribution(gloss_config.font_size_factor, rng)
+
+    # --- MODIFIED: Calculate gloss character spacing relative to the main line's ---
+    spacing_multiplier = sample_from_distribution(gloss_config.character_spacing_multiplier, rng)
+    gloss_char_spacing = main_char_spacing * spacing_multiplier
+    # --- END MODIFICATION ---
+    
+    gloss_word_spacing = gloss_char_spacing * sample_from_distribution(content_config.word_spacing_factor, rng)
+    
+    y_offset_factor = sample_from_distribution(gloss_config.vertical_offset_factor, rng)
+    gloss_y = base_y + y_sign * (line_spacing * y_offset_factor)
+
+    gloss_words = []
+    gloss_current_x = 0
+    gloss_words_per_line = sample_from_distribution(gloss_config.words_per_line, rng)
+    for _ in range(gloss_words_per_line):
+        chars_in_word_gloss = sample_from_distribution(gloss_config.chars_per_word, rng)
+        points = [Point(x=gloss_current_x + i * gloss_char_spacing, y=gloss_y, font_size=gloss_font_size) for i in range(chars_in_word_gloss)]
+        gloss_current_x += (chars_in_word_gloss * gloss_char_spacing) + gloss_word_spacing
+        gloss_words.append(Word(points=points))
+        
+    if not gloss_words:
+        return []
+        
+    gloss_width = gloss_current_x - gloss_word_spacing
+    slack_space = main_line_width - gloss_width
+    
+    horizontal_offset = 0
+    if slack_space > 0:
+        horizontal_offset = rng.uniform(0, slack_space)
+
+    if horizontal_offset > 0:
+        for word in gloss_words:
+            for point in word.points:
+                point.x += horizontal_offset
+        
+    return gloss_words
+
 def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.Generator) -> Tuple[List[TextLine], float, float]:
     """Helper to generate the raw text lines for a textbox, including interlinear glosses."""
     lines_per_box = sample_from_distribution(box_config.lines_per_box, rng)
@@ -122,41 +179,27 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
     word_spacing = char_spacing * sample_from_distribution(content_config.word_spacing_factor, rng)
     line_spacing = char_spacing * sample_from_distribution(content_config.line_spacing_factor, rng)
     line_break_probability = sample_from_distribution(content_config.line_break_probability, rng)
-    # word_spacing = base_font_size * sample_from_distribution(content_config.word_spacing_factor, rng)
-    # line_spacing = base_font_size * sample_from_distribution(content_config.line_spacing_factor, rng)
-
-    
-
-    
 
     text_lines = []
     max_line_width = 0
     current_y = 0
     
-    # Check if this textbox type can have glosses
     has_gloss_prob = getattr(box_config, 'interlinear_gloss_probability', 0)
+    words_per_line = sample_from_distribution(box_config.words_per_line, rng)
     
-    words_per_line = sample_from_distribution(box_config.words_per_line, rng) # for sanskrit, this is always 1
     for _ in range(lines_per_box):
-        # --- Generate the main line of text ---
-        
         current_x = 0
         main_words = []
         for _ in range(words_per_line):
-            # chars_in_word = sample_from_distribution(content_config.chars_per_word, rng)
-            # points = [Point(x=current_x + i * char_spacing, y=current_y, font_size=base_font_size) for i in range(chars_in_word)]
             points = []
             if rng.random() > line_break_probability:
-                for i in range(chars_in_word):
-                    points.append(Point(x=current_x + i * char_spacing, y=current_y, font_size=base_font_size))
-                current_x += (chars_in_word * char_spacing) + word_spacing
+                num_chars_in_word = chars_in_word
             else:
-                random_chars = rng.integers(0, chars_in_word-1)
-                for i in range(chars_in_word-random_chars):
-                    points.append(Point(x=current_x + i * char_spacing, y=current_y, font_size=base_font_size))
+                num_chars_in_word = rng.integers(1, chars_in_word) if chars_in_word > 1 else 1
 
-                current_x += ((chars_in_word-random_chars) * char_spacing) + word_spacing
-                
+            for i in range(num_chars_in_word):
+                points.append(Point(x=current_x + i * char_spacing, y=current_y, font_size=base_font_size))
+            current_x += (num_chars_in_word * char_spacing) + word_spacing
             main_words.append(Word(points=points))
         
         line_width = current_x - word_spacing
@@ -165,36 +208,32 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
             
         text_line = TextLine(words=main_words)
 
-        # --- Generate and place the gloss, if applicable ---
         if rng.random() < has_gloss_prob:
             gloss_config = content_config.interlinear_gloss
-            gloss_font_size = base_font_size * sample_from_distribution(gloss_config.font_size_factor, rng)
-            gloss_char_spacing = gloss_font_size * sample_from_distribution(content_config.character_spacing_factor, rng)
-            gloss_word_spacing = gloss_font_size * sample_from_distribution(content_config.word_spacing_factor, rng)
-            
-            # Position the gloss vertically between the current line and the next.
-            # We add the gloss *before* advancing the main `current_y`.
-            y_offset_factor = sample_from_distribution(gloss_config.vertical_offset_factor, rng)
-            gloss_y = current_y - (line_spacing * y_offset_factor)
+            placement = sample_from_distribution(gloss_config.placement, rng)
 
-            gloss_words = []
-            gloss_current_x = 0 # Gloss is left-aligned relative to the line start
-            gloss_words_per_line = sample_from_distribution(gloss_config.words_per_line, rng)
-            for _ in range(gloss_words_per_line):
-                # chars_in_word = sample_from_distribution(content_config.chars_per_word, rng)
-                chars_in_word_gloss = sample_from_distribution(gloss_config.chars_per_word, rng)
-                points = [Point(x=gloss_current_x + i * gloss_char_spacing, y=gloss_y, font_size=gloss_font_size) for i in range(chars_in_word_gloss)]
-                gloss_current_x += (chars_in_word_gloss * gloss_char_spacing) + gloss_word_spacing
-                gloss_words.append(Word(points=points))
+            if placement in ["above", "both"]:
+                # --- MODIFICATION: Pass char_spacing to the helper function ---
+                gloss_above_words = _create_one_gloss_line(
+                    current_y, y_sign=1, main_line_width=line_width, main_char_spacing=char_spacing,
+                    line_spacing=line_spacing, base_font_size=base_font_size, content_config=content_config, rng=rng
+                )
+                text_line.interlinear_gloss_above = gloss_above_words
 
-            text_line.interlinear_gloss = gloss_words
+            if placement in ["below", "both"]:
+                # --- MODIFICATION: Pass char_spacing to the helper function ---
+                gloss_below_words = _create_one_gloss_line(
+                    current_y, y_sign=-1, main_line_width=line_width, main_char_spacing=char_spacing,
+                    line_spacing=line_spacing, base_font_size=base_font_size, content_config=content_config, rng=rng
+                )
+                text_line.interlinear_gloss_below = gloss_below_words
 
         text_lines.append(text_line)
-        current_y -= line_spacing # Move to the next line
+        current_y -= line_spacing
         
     return text_lines, max_line_width, (abs(current_y) - line_spacing)
 
-
+# ... (_apply_text_alignment and create_textbox are unchanged) ...
 def _apply_text_alignment(text_lines: List[TextLine], alignment: TextAlignment, box_width: float, content_config: Config, rng: np.random.Generator):
     """Applies alignment to the text lines *in place*."""
     if alignment == TextAlignment.LEFT:
@@ -215,19 +254,40 @@ def _apply_text_alignment(text_lines: List[TextLine], alignment: TextAlignment, 
         elif alignment == TextAlignment.CENTER:
             offset = (box_width - line_width) / 2
         elif alignment == TextAlignment.JUSTIFY:
-            slack = box_width - line_width
-            if slack > 0 and len(line.words) > 1:
-                # Distribute slack by increasing word spacing
-                extra_space_per_gap = slack / (len(line.words) - 1)
-                cumulative_extra_space = 0
-                for i in range(1, len(line.words)):
-                    cumulative_extra_space += extra_space_per_gap
-                    for point in line.words[i].points:
-                        point.x += cumulative_extra_space
+            # Handle main line justify
+            if len(line.words) > 1:
+                slack = box_width - line_width
+                if slack > 0:
+                    extra_space_per_gap = slack / (len(line.words) - 1)
+                    cumulative_extra_space = 0
+                    for i in range(1, len(line.words)):
+                        cumulative_extra_space += extra_space_per_gap
+                        for point in line.words[i].points:
+                            point.x += cumulative_extra_space
+            # Also apply alignment to glosses (non-justify)
+            gloss_lines = [line.interlinear_gloss_above, line.interlinear_gloss_below]
+            for gloss_line in gloss_lines:
+                if gloss_line:
+                    gloss_last_point = gloss_line[-1].points[-1]
+                    gloss_width = gloss_last_point.x - gloss_line[0].points[0].x
+                    gloss_offset = 0
+                    if alignment == TextAlignment.RIGHT:
+                        gloss_offset = box_width - gloss_width
+                    elif alignment == TextAlignment.CENTER:
+                        gloss_offset = (box_width - gloss_width) / 2
+                    
+                    if gloss_offset != 0:
+                        for word in gloss_line:
+                            for point in word.points:
+                                point.x += gloss_offset
             continue # Justify logic is self-contained
 
-        # Apply offset to all points in the line
-        for word in line.words:
+        # Apply offset to all points in the line (and its glosses)
+        all_words = list(line.words)
+        if line.interlinear_gloss_above: all_words.extend(line.interlinear_gloss_above)
+        if line.interlinear_gloss_below: all_words.extend(line.interlinear_gloss_below)
+
+        for word in all_words:
             for point in word.points:
                 point.x += offset
 
