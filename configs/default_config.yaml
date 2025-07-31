@@ -58,7 +58,7 @@ textbox_content:
     vertical_offset_factor: { dist: "uniform_float", min: 0.3, max: 0.6 }
     chars_per_word: { dist: "uniform_int", min: 2, max: 10 }
     placement: { dist: "choice", choices: ["above", "below", "both"], weights: [0.4, 0.4, 0.2] }
-    character_spacing_multiplier: { dist: "uniform_float", min: 1.0, max: 2 }
+    character_spacing_multiplier: { dist: "normal", mean: 1.0, std: 0.3 } # Slightly varied spacing
 
   marginalia:
     font_size: { dist: "uniform_int", min: 3, max: 30 }
@@ -87,6 +87,13 @@ textbox_content:
   # Line Breaks
   line_break_probability: { dist: "uniform_float", min: 0.0, max: 0.2 }
 
+   # --- NEW: Configuration for slight line length variation ---
+  line_length_variation:
+    # Max variation as a fraction of the base line length.
+    # e.g., 0.1 means lines can be up to 10% shorter or longer than the base.
+    variation_factor: { dist: "uniform_float", min: 0.0, max: 0.1 }
+  # --- END NEW ---
+
   # Augmentations (Phase 1)
   font_size_variation:
     enabled: true
@@ -98,7 +105,7 @@ textbox_content:
     jitter_std_factor: { dist: "uniform_float", min: 0.05, max: 0.15 }
 
   congestion_jitter:
-    enabled: true
+    enabled: false
     # Percentage of points to be heavily jittered
     percentage: { dist: "uniform_float", min: 0.0, max: 0.02 }
     # Jitter strength as a multiplier of line spacing

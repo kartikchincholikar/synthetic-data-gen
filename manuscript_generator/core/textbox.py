@@ -184,8 +184,7 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
     """Helper to generate the raw text lines for a textbox, including interlinear glosses."""
     lines_per_box = sample_from_distribution(box_config.lines_per_box, rng)
     base_font_size = sample_from_distribution(box_config.font_size, rng)
-    chars_in_word = sample_from_distribution(box_config.chars_per_word, rng)
-    
+
     char_spacing = base_font_size * sample_from_distribution(content_config.character_spacing_factor, rng)
     word_spacing = char_spacing * sample_from_distribution(content_config.word_spacing_factor, rng)
     line_spacing = char_spacing * sample_from_distribution(content_config.line_spacing_factor, rng)
@@ -195,18 +194,37 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
     max_line_width = 0
     current_y = 0
     
+    # --- MODIFIED: Implement the "sample-once-then-vary" pattern ---
+    # 1. Sample the base properties for the entire textbox once.
+    base_words_per_line = sample_from_distribution(box_config.words_per_line, rng)
+    base_chars_per_word = sample_from_distribution(box_config.chars_per_word, rng)
+    variation_factor = sample_from_distribution(content_config.line_length_variation.variation_factor, rng)
+    # --- END MODIFICATION ---
+
     has_gloss_prob = getattr(box_config, 'interlinear_gloss_probability', 0)
-    words_per_line = sample_from_distribution(box_config.words_per_line, rng)
     
     for _ in range(lines_per_box):
+        # --- MODIFIED: Apply slight variation to the base values for each line ---
+        # Calculate the allowed character deviation for this line
+        char_variation = int(base_chars_per_word * variation_factor)
+        
+        # Apply a random delta within the allowed variation
+        # The +1 is needed because rng.integers has an exclusive upper bound
+        random_delta = rng.integers(-char_variation, char_variation + 1) if char_variation > 0 else 0
+        
+        # Ensure the final character count is at least 1
+        final_chars_per_word = max(1, base_chars_per_word + random_delta)
+        # --- END MODIFICATION ---
+
+        # Generate the main line of text using the calculated `final_chars_per_word`
         current_x = 0
         main_words = []
-        for _ in range(words_per_line):
+        for _ in range(base_words_per_line): # Assuming words_per_line is constant
             points = []
             if rng.random() > line_break_probability:
-                num_chars_in_word = chars_in_word
+                num_chars_in_word = final_chars_per_word
             else:
-                num_chars_in_word = rng.integers(1, chars_in_word) if chars_in_word > 1 else 1
+                num_chars_in_word = rng.integers(1, final_chars_per_word) if final_chars_per_word > 1 else 1
 
             for i in range(num_chars_in_word):
                 points.append(Point(x=current_x + i * char_spacing, y=current_y, font_size=base_font_size))
@@ -219,12 +237,12 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
             
         text_line = TextLine(words=main_words)
 
+        # ... (The rest of the function, including gloss generation, remains unchanged) ...
         if rng.random() < has_gloss_prob:
             gloss_config = content_config.interlinear_gloss
             placement = sample_from_distribution(gloss_config.placement, rng)
 
             if placement in ["above", "both"]:
-                # --- MODIFICATION: Pass char_spacing to the helper function ---
                 gloss_above_words = _create_one_gloss_line(
                     current_y, y_sign=1, main_line_width=line_width, main_char_spacing=char_spacing,
                     line_spacing=line_spacing, base_font_size=base_font_size, content_config=content_config, rng=rng
@@ -232,7 +250,6 @@ def _create_text_lines(box_config: dict, content_config: Config, rng: np.random.
                 text_line.interlinear_gloss_above = gloss_above_words
 
             if placement in ["below", "both"]:
-                # --- MODIFICATION: Pass char_spacing to the helper function ---
                 gloss_below_words = _create_one_gloss_line(
                     current_y, y_sign=-1, main_line_width=line_width, main_char_spacing=char_spacing,
                     line_spacing=line_spacing, base_font_size=base_font_size, content_config=content_config, rng=rng

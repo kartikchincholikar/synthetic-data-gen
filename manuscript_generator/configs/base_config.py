@@ -79,6 +79,9 @@ class InterlinearGlossConfig(BaseModel):
     placement: AnyDist
     character_spacing_multiplier: AnyDist
 
+class LineLengthVariationConfig(BaseModel):
+    variation_factor: AnyDist
+
 class TextBoxContentConfig(BaseModel):
     main_text: TextBoxContentParams
     marginalia: TextBoxContentParams
@@ -88,10 +91,12 @@ class TextBoxContentConfig(BaseModel):
     word_spacing_factor: AnyDist
     line_spacing_factor: AnyDist
     line_break_probability: AnyDist
+    line_length_variation: LineLengthVariationConfig
     font_size_variation: Dict[str, Any]
     point_level_jitter: Dict[str, Any]
     congestion_jitter: Dict[str, Any]
     interlinear_gloss: InterlinearGlossConfig
+    
 
 class DistortionAugmentationConfig(BaseModel):
     enabled: bool
