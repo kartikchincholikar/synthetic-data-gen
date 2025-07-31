@@ -132,7 +132,7 @@ textbox_distortion:
     enabled: true
     probability: 1
     num_creases: { dist: "uniform_int", min: 1, max: 2 }
-    strength: { dist: "uniform_float", min: -0.2, max: -0.1 } # Slightly stronger range
+    strength: { dist: "uniform_float", min: -0.1, max: -0.05 } # Slightly stronger range
     angle_deg: { dist: "uniform_float", min: -5.0, max: 5.0 }
     position_factor: { dist: "uniform_float", min: -0.45, max: 0.45 }
     crease_width_factor: { dist: "uniform_float", min: 0.05, max: 0.2 }
@@ -141,7 +141,7 @@ textbox_distortion:
     # -0.5 is left edge, 0 is center, 0.5 is right edge.
     crease_center_x_factor: { dist: "uniform_float", min: -0.4, max: 0.4 }
     # Length of the crease, as a fraction of the textbox width.
-    crease_length_factor: { dist: "uniform_float", min: 0.2, max: 0.7 }
+    crease_length_factor: { dist: "uniform_float", min: 0.2, max: 0.3 }
     # --- END NEW ---
 
 # --- Page-Level Augmentations (Phase 3) ---
