@@ -17,8 +17,8 @@ visualization:
 
 # --- Page Generation ---
 page:
-  width: { dist: "uniform_int", min: 1500, max: 3000 }
-  height: { dist: "uniform_int", min: 750, max: 1500 }
+  width: { dist: "uniform_int", min: 750, max: 1500 }
+  height: { dist: "uniform_int", min: 375, max: 750 }
   layout_strategy:
     # Name of the strategy to use. Options are registered in the code.
     # We can use a choice distribution to randomly select a strategy per page.
