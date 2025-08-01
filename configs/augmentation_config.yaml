@@ -1,8 +1,8 @@
 # augmentation_config.yaml
 
 general:
-  input_dir: "real-dataset"
-  output_dir: "augmented-dataset"
+  input_dir: "./data/real-dataset"
+  output_dir: "./data/augmented-dataset"
   num_augmentations_per_sample: 5
   num_workers: -1 # Use all available CPU cores
   base_seed: 42

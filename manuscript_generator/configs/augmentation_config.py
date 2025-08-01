@@ -45,8 +45,8 @@ AnyDist = Union[UniformInt, UniformFloat, Normal, Constant, Choice]
 
 class GeneralConfig(BaseModel):
     """General settings for the augmentation script."""
-    input_dir: str = "real-dataset"
-    output_dir: str = "augmented-dataset"
+    input_dir: str = "./data/real-dataset"
+    output_dir: str = "./data/augmented-dataset"
     num_augmentations_per_sample: int = 5
     num_workers: int = -1
     base_seed: int = 42

@@ -5,7 +5,7 @@ generation:
   num_samples: 10
   num_workers: -1 # -1 means use all available CPU cores
   base_seed: 44
-  output_dir: "./base-dataset"
+  output_dir: "./data/synthetic-dataset"
   dry_run_num_samples: 20 # Number of samples for a dry run
 
 # --- Visualization Settings ---
@@ -45,9 +45,9 @@ textbox_content:
   # Base parameters per textbox type
   main_text:
     font_size: { dist: "uniform_int", min: 15, max: 30 } #our manuscript actually don't have this big font size
-    lines_per_box: { dist: "uniform_int", min: 8, max: 25 }
+    lines_per_box: { dist: "uniform_int", min: 4, max: 25 }
     words_per_line: { dist: "uniform_int", min: 1, max: 1 }
-    chars_per_word: { dist: "uniform_int", min: 30, max: 50 }
+    chars_per_word: { dist: "uniform_int", min: 9, max: 50 }
     alignment: { dist: "choice", choices: ["left", "right", "center", "justify"], weights: [0.4, 0.1, 0.1, 0.4] }
     interlinear_gloss_probability: 0.08 # Probability that any given line in this box will have a gloss
     
